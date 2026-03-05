@@ -1,0 +1,322 @@
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+
+_G.InstaPickup = false 
+_G.IsGrabbing = false
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "CoolHub_Steal"
+ScreenGui.Parent = (gethui and gethui()) or CoreGui
+ScreenGui.ResetOnSpawn = false
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 200, 0, 100)
+MainFrame.Position = UDim2.new(0.5, -100, 0.5, -50)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 0, 40)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true 
+MainFrame.Parent = ScreenGui
+
+local Corner = Instance.new("UICorner", MainFrame)
+Corner.CornerRadius = UDim.new(0, 10)
+
+local Stroke = Instance.new("UIStroke", MainFrame)
+Stroke.Color = Color3.fromRGB(180, 0, 255)
+Stroke.Thickness = 2
+
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundTransparency = 1
+Title.Text = "AUTO GRAB"
+Title.TextColor3 = Color3.fromRGB(180, 0, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 20
+
+local Credit = Instance.new("TextLabel", MainFrame)
+Credit.Size = UDim2.new(1, 0, 0, 20)
+Credit.Position = UDim2.new(0, 0, 0, 80)
+Credit.BackgroundTransparency = 1
+Credit.Text = "by omniz"
+Credit.TextColor3 = Color3.fromRGB(150, 150, 150)
+Credit.Font = Enum.Font.Gotham
+Credit.TextSize = 12
+Credit.TextTransparency = 0.3
+
+local ToggleBtn = Instance.new("TextButton", MainFrame)
+ToggleBtn.Size = UDim2.new(0, 160, 0, 40)
+ToggleBtn.Position = UDim2.new(0.5, -80, 0, 35)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 0, 60)
+ToggleBtn.Text = "AUTO GRAB: OFF"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.TextSize = 14
+ToggleBtn.ZIndex = 3
+local ToggleCorner = Instance.new("UICorner", ToggleBtn)
+ToggleCorner.CornerRadius = UDim.new(0, 8)
+
+local ProgressContainer = Instance.new("Frame", ScreenGui)
+ProgressContainer.Size = UDim2.new(0, 400, 0, 15)
+ProgressContainer.AnchorPoint = Vector2.new(0.5, 0)
+ProgressContainer.Position = UDim2.new(0.5, 0, 0.05, 0)
+ProgressContainer.BackgroundColor3 = Color3.fromRGB(15, 0, 25)
+ProgressContainer.BorderSizePixel = 0
+ProgressContainer.Visible = false
+ProgressContainer.ZIndex = 2
+local ProgressCorner = Instance.new("UICorner", ProgressContainer)
+ProgressCorner.CornerRadius = UDim.new(0, 8)
+
+local ProgressBar = Instance.new("Frame", ProgressContainer)
+ProgressBar.Size = UDim2.new(0, 0, 1, 0)
+ProgressBar.Position = UDim2.new(0, 0, 0, 0)
+ProgressBar.BackgroundColor3 = Color3.fromRGB(180, 0, 255)
+ProgressBar.BorderSizePixel = 0
+ProgressBar.ZIndex = 3
+local ProgressBarCorner = Instance.new("UICorner", ProgressBar)
+ProgressBarCorner.CornerRadius = UDim.new(0, 8)
+
+local Gradient = Instance.new("UIGradient", ProgressBar)
+Gradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(180, 0, 255)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(220, 100, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(180, 0, 255))
+})
+Gradient.Rotation = 90
+
+local Glow = Instance.new("Frame", ProgressBar)
+Glow.Size = UDim2.new(1, 0, 0.2, 0)
+Glow.Position = UDim2.new(0, 0, 0, 0)
+Glow.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+Glow.BackgroundTransparency = 0.9
+Glow.BorderSizePixel = 0
+Glow.ZIndex = 4
+
+local ProgressText = Instance.new("TextLabel", ProgressContainer)
+ProgressText.Size = UDim2.new(1, 0, 1, 0)
+ProgressText.BackgroundTransparency = 1
+ProgressText.Text = "0%"
+ProgressText.TextColor3 = Color3.fromRGB(255, 255, 255)
+ProgressText.Font = Enum.Font.GothamBold
+ProgressText.TextSize = 12
+ProgressText.TextStrokeTransparency = 0.7
+ProgressText.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+ProgressText.ZIndex = 5
+
+local pulseTween
+local function pulseAnimation()
+    if pulseTween then pulseTween:Cancel() end
+    
+    pulseTween = TweenService:Create(
+        ProgressBar,
+        TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut, -1, true),
+        {BackgroundTransparency = 0.3}
+    )
+    pulseTween:Play()
+end
+
+local function updateProgress(progress, isActive)
+    if _G.InstaPickup or isActive then
+        ProgressContainer.Visible = true
+        local width = math.clamp(progress, 0, 100)
+        ProgressBar.Size = UDim2.new(width / 100, 0, 1, 0)
+        ProgressText.Text = string.format("%d%%", math.floor(width))
+        
+        if isActive then
+            if width < 30 then
+                ProgressBar.BackgroundColor3 = Color3.fromRGB(255, 50, 100)
+            elseif width < 70 then
+                ProgressBar.BackgroundColor3 = Color3.fromRGB(200, 50, 255)
+            else
+                ProgressBar.BackgroundColor3 = Color3.fromRGB(180, 0, 255)
+            end
+            
+            Gradient.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, ProgressBar.BackgroundColor3),
+                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(
+                    math.min(255, ProgressBar.BackgroundColor3.R * 255 + 40),
+                    math.min(255, ProgressBar.BackgroundColor3.G * 255 + 40),
+                    math.min(255, ProgressBar.BackgroundColor3.B * 255 + 40)
+                )),
+                ColorSequenceKeypoint.new(1, ProgressBar.BackgroundColor3)
+            })
+            
+            pulseAnimation()
+        else
+            ProgressBar.BackgroundColor3 = Color3.fromRGB(80, 0, 120)
+            Gradient.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(80, 0, 120)),
+                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(100, 0, 150)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 0, 120))
+            })
+            if pulseTween then
+                pulseTween:Cancel()
+                pulseTween = nil
+            end
+        end
+    else
+        ProgressContainer.Visible = false
+        if pulseTween then
+            pulseTween:Cancel()
+            pulseTween = nil
+        end
+        ProgressBar.Size = UDim2.new(0, 0, 1, 0)
+        ProgressText.Text = "0%"
+    end
+end
+
+local function startGrabAnimation(duration)
+    _G.IsGrabbing = true
+    
+    local startTime = tick()
+    local endTime = startTime + duration
+    
+    while tick() < endTime and _G.IsGrabbing and _G.InstaPickup do
+        local elapsed = tick() - startTime
+        local progress = math.min((elapsed / duration) * 100, 100)
+        
+        updateProgress(progress, true)
+        RunService.RenderStepped:Wait()
+    end
+    
+    if _G.IsGrabbing and _G.InstaPickup then
+        updateProgress(100, true)
+        task.wait(0.3)
+        updateProgress(0, false)
+        _G.IsGrabbing = false
+    else
+        updateProgress(0, false)
+        _G.IsGrabbing = false
+    end
+end
+
+ToggleBtn.MouseButton1Click:Connect(function()
+    _G.InstaPickup = not _G.InstaPickup
+    
+    if _G.InstaPickup then
+        ToggleBtn.Text = "AUTO GRAB: ON"
+        ToggleBtn.TextColor3 = Color3.fromRGB(0, 255, 150)
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(30, 0, 50)
+        updateProgress(0, false)
+    else
+        ToggleBtn.Text = "AUTO GRAB: OFF"
+        ToggleBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 0, 60)
+        _G.IsGrabbing = false
+        updateProgress(0, false)
+    end
+end)
+
+local function getCharacter()
+    return LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+end
+
+local function getHRP()
+    local char = getCharacter()
+    return char:WaitForChild("HumanoidRootPart", 5)
+end
+
+local HRP = getHRP()
+local Humanoid = getCharacter():WaitForChild("Humanoid")
+
+LocalPlayer.CharacterAdded:Connect(function(newChar)
+    HRP = newChar:WaitForChild("HumanoidRootPart", 5)
+    Humanoid = newChar:WaitForChild("Humanoid")
+end)
+
+local function getPromptPosition(prompt)
+    local parent = prompt.Parent
+    if parent:IsA("BasePart") then return parent.Position end
+    if parent:IsA("Model") then
+        local primary = parent.PrimaryPart or parent:FindFirstChildWhichIsA("BasePart")
+        return primary and primary.Position or nil
+    end
+    if parent:IsA("Attachment") then return parent.WorldPosition end
+    local part = parent:FindFirstChildWhichIsA("BasePart", true)
+    return part and part.Position or nil
+end
+
+local promptCache = {}
+local lastCacheUpdate = 0
+
+task.spawn(function()
+    RunService.Heartbeat:Connect(function()
+        if _G.InstaPickup and not _G.IsGrabbing then
+            if Humanoid and Humanoid.WalkSpeed > 25 then
+                local now = tick()
+                if now - lastCacheUpdate < 0.05 then return end
+                
+                promptCache = {}
+                local plotsFolder = workspace:FindFirstChild("Plots")
+                if not plotsFolder then return end
+                
+                for _, plot in pairs(plotsFolder:GetChildren()) do
+                    for _, descendant in pairs(plot:GetDescendants()) do
+                        if descendant:IsA("ProximityPrompt") and descendant.Enabled and descendant.ActionText == "Steal" then
+                            local pos = getPromptPosition(descendant)
+                            if pos then
+                                table.insert(promptCache, {
+                                    Prompt = descendant,
+                                    Position = pos,
+                                    MaxDistance = descendant.MaxActivationDistance
+                                })
+                            end
+                        end
+                    end
+                end
+                
+                lastCacheUpdate = now
+                
+                local nearest = nil
+                local minDist = math.huge
+                local currentPos = HRP.Position
+                
+                for _, cached in ipairs(promptCache) do
+                    if cached.Prompt and cached.Prompt:IsDescendantOf(workspace) and cached.Prompt.Enabled then
+                        local distance = (currentPos - cached.Position).Magnitude
+                        if distance <= cached.MaxDistance and distance < minDist then
+                            minDist = distance
+                            nearest = cached.Prompt
+                        end
+                    end
+                end
+                
+                if nearest and minDist <= nearest.MaxActivationDistance then
+                    if not nearest or not nearest:IsDescendantOf(workspace) then return end
+                    
+                    pcall(function() 
+                        fireproximityprompt(nearest, 1000, math.huge) 
+                    end)
+                    
+                    task.spawn(function()
+                        startGrabAnimation(1.30)
+                    end)
+                    
+                    pcall(function()
+                        nearest:InputHoldBegin()
+                        task.wait(0.03)
+                        nearest:InputHoldEnd()
+                    end)
+                end
+            end
+        end
+    end)
+end)
+
+ToggleBtn.MouseEnter:Connect(function()
+    if not _G.InstaPickup then
+        TweenService:Create(ToggleBtn, TweenInfo.new(0.2), {
+            BackgroundColor3 = Color3.fromRGB(50, 0, 80)
+        }):Play()
+    end
+end)
+
+ToggleBtn.MouseLeave:Connect(function()
+    if not _G.InstaPickup then
+        TweenService:Create(ToggleBtn, TweenInfo.new(0.2), {
+            BackgroundColor3 = Color3.fromRGB(40, 0, 60)
+        }):Play()
+    end
+end)
